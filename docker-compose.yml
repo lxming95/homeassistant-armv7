@@ -1,0 +1,12 @@
+services:
+  homeassistant:
+    image: myrepo.local:5000/homeassistant-armv7-lean:2026.7.1
+    container_name: homeassistant
+    restart: unless-stopped
+    network_mode: host
+    extra_hosts:
+      - postgresql.app.kebenet.lan:192.168.2.60
+    environment:
+      - TZ=Europe/Warsaw
+    volumes:
+      - /opt/ha/config:/config
