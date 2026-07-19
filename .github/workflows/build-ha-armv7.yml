@@ -1,71 +1,74 @@
-name: Build HA ARMv7 Image
+name: Build Home Assistant ARMv7 Lean Image
+run-name: Build HA ${{ github.event.inputs.ha_version }} - ${{ github.event.inputs.build_target }}
 on:
-  # 手动触发
   workflow_dispatch:
     inputs:
-      ha_ver:
-        description: Home Assistant Version
+      ha_version:
+        description: Home Assistant 版本号
+        required: true
         default: "2026.7.1"
-        type: choice
-        options:
-          - 2026.7.1
-          - 2026.7.2
+        type: text
       build_target:
-        description: Build Target runtime/full
-        default: "runtime"
+        description: 构建目标 runtime=精简 / full=完整版(带编译工具，玩客云推荐)
+        required: true
+        default: "full"
         type: choice
         options:
           - runtime
           - full
-  # 推送代码自动构建
   push:
     branches: [ main ]
 
 jobs:
-  build-push:
+  build_and_push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: 拉取仓库代码
         uses: actions/checkout@v4
 
-      # 初始化QEMU多架构模拟器，支持arm/v7
-      - name: Set up QEMU
+      # 启用QEMU模拟armv7架构
+      - name: 初始化QEMU多架构模拟器
         uses: docker/setup-qemu-action@v3
 
       # 初始化buildx构建器
-      - name: Set up Docker Buildx
+      - name: 初始化Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 登录GHCR（关键密钥配置）
-      - name: Login GHCR
+      # 登录GHCR镜像仓库
+      - name: 登录GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 定义镜像变量
-      - name: Set Env
+      # 统一环境变量，和build.sh默认参数对齐
+      - name: 设置构建环境变量
         run: |
-          echo "HA_VERSION=${{ github.event.inputs.ha_ver || '2026.7.1' }}" >> $GITHUB_ENV
-          echo "BUILD_TARGET=${{ github.event.inputs.build_target || 'runtime' }}" >> $GITHUB_ENV
+          echo "HA_VERSION=${{ github.event.inputs.ha_version }}" >> $GITHUB_ENV
+          echo "BUILD_TARGET=${{ github.event.inputs.build_target }}" >> $GITHUB_ENV
+          echo "PYTHON_VERSION=3.14.2" >> $GITHUB_ENV
+          echo "PYTHON_BUILD_JOBS=1" >> $GITHUB_ENV
+          echo "BASE_IMAGE=ghcr.io/home-assistant/armv7-base:3.22" >> $GITHUB_ENV
           echo "IMAGE_NAME=homeassistant-armv7-lean" >> $GITHUB_ENV
-          echo "GHCR_REPO=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME" >> $GITHUB_ENV
+          echo "GHCR_FULL_REPO=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME" >> $GITHUB_ENV
 
-      # 云端交叉编译镜像（等价本地 ./build.sh）
-      - name: Build & Push ARMv7 Image
-        env:
-          PYTHON_BUILD_JOBS: 1
+      # 交叉编译armv7镜像并推送至GHCR
+      - name: Build & Push ARMv7 Docker Image
         run: |
           docker buildx build \
             --platform linux/arm/v7 \
             --build-arg HA_VERSION=${{ env.HA_VERSION }} \
-            --build-arg PYTHON_VERSION=3.14.2 \
+            --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} \
             --build-arg BUILD_TARGET=${{ env.BUILD_TARGET }} \
-            -t ${{ env.GHCR_REPO }}:${{ env.HA_VERSION }} \
-            -t ${{ env.GHCR_REPO }}:latest \
+            --build-arg PYTHON_BUILD_JOBS=${{ env.PYTHON_BUILD_JOBS }} \
+            --build-arg BASE_IMAGE=${{ env.BASE_IMAGE }} \
+            -t ${{ env.GHCR_FULL_REPO }}:${{ env.HA_VERSION }} \
+            -t ${{ env.GHCR_FULL_REPO }}:latest \
             --push .
 
-      # 输出镜像地址
-      - name: Output Image URL
-        run: echo "镜像地址：${{ env.GHCR_REPO }}:${{ env.HA_VERSION }}"
+      # 输出最终镜像拉取地址
+      - name: 输出镜像地址
+        run: |
+          echo "构建完成，镜像地址：${{ env.GHCR_FULL_REPO }}:${{ env.HA_VERSION }}"
+          echo "拉取命令：docker pull --platform linux/arm/v7 ${{ env.GHCR_FULL_REPO }}:${{ env.HA_VERSION }}"
