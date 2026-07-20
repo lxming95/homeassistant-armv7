@@ -1,8 +1,8 @@
-🚀 为玩客云（OneCloud）部署 Home Assistant
+# 🚀 为玩客云（OneCloud）部署 Home Assistant
 本项目通过 GitHub Actions 自动构建 armv7 架构的 Home Assistant 镜像，并针对玩客云（1GB 内存）进行了运行时优化。
 镜像内置了完整的编译工具链（gcc、rust、cargo 等），确保 HACS 自定义组件能在设备上顺利编译，避免因内存不足或缺失工具而失败。
 
-✅ 前提条件
+## ✅ 前提条件
 玩客云已刷入 Armbian / Debian / Ubuntu 等 Linux 系统（32-bit）
 
 已安装 Docker（≥ 20.10）和 Docker Compose（可选）
@@ -53,6 +53,8 @@ Loaded image: ghcr.io/你的用户名/ha-armv7:2026.7.2-full-armv7
 2. （可选）打上短标签
 bash
 docker tag ghcr.io/你的用户名/ha-armv7:2026.7.2-full-armv7 ha:latest
+
+
 ----------------------
 # Home Assistant Core on ARMv7 (Orange Pi Plus 2)
 
