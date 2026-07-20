@@ -14,7 +14,7 @@ SHELL ["/bin/sh", "-lc"]
 
 ARG PYTHON_VERSION=3.14.2
 ARG PYTHON_BUILD_JOBS=1
-ARG HA_VERSION=2026.7.1
+ARG HA_VERSION=2026.7.2
 
 ENV CARGO_BUILD_JOBS=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -55,7 +55,8 @@ RUN apk add --no-cache --virtual .build-deps \
       lapack-dev \
       ffmpeg-dev \
       libjpeg-turbo-dev \
-      postgresql-dev
+      postgresql-dev \
+      libpcap-dev
 
 RUN wget -O /tmp/Python-${PYTHON_VERSION}.tgz \
       "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" && \
@@ -103,8 +104,7 @@ RUN apk add --no-cache \
 RUN python3 -m pip install --no-cache-dir --no-compile \
       "psycopg2==2.9.11"
 
-# Keep Rust new enough for pydantic-core fallback source builds. Pip should
-# prefer the cp314 musllinux armv7l wheel from PyPI when available.
+# Keep Rust new enough for pydantic-core fallback source builds.
 RUN apk add --no-cache \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
@@ -119,18 +119,25 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
       "gcal-sync==8.0.0" \
       "oauth2client==4.1.3"
 
-RUN python3 -m pip install --no-cache-dir --no-compile \
-      "pymicro-vad==1.0.1" \
-      "pyspeex-noise==1.0.2" \
-      "hassil==3.8.0" \
-      "home-assistant-intents==2026.6.24" \
-      "habluetooth==6.26.2" \
-      "bluetooth-adapters==2.4.0" \
+# ============================================================
+# CRITICAL: Force source builds for packages without armv7 wheels
+# ============================================================
+RUN python3 -m pip install --no-cache-dir --no-compile --no-binary \
       "bleak==3.0.2" \
-      "dbus-fast==5.0.22"
+      "dbus-fast==5.0.22" \
+      "habluetooth==6.26.5" \
+      "bleak-esphome==3.9.4"
 
-# Additional integration requirements observed in runtime logs. Keeping them in
-# the builder avoids lazy installs that would otherwise need compilers.
+# ============================================================
+# Pre-install frontend to avoid runtime download
+# ============================================================
+RUN python3 -m pip install --no-cache-dir --no-compile \
+      "home-assistant-frontend==20260624.5" \
+      "home-assistant-intents==2026.6.24"
+
+# ============================================================
+# Other integration requirements
+# ============================================================
 RUN apk add --no-cache \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
@@ -155,7 +162,6 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
       "colorlog==6.10.1"
 
 RUN python3 -m pip install --no-cache-dir --no-compile \
-      "home-assistant-frontend==20260624.4" \
       "infrared-protocols==6.3.0" \
       "rf-protocols==4.3.0" \
       "jsonpath-python==1.1.6" \
@@ -177,9 +183,8 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
       "RestrictedPython==8.1" \
       "wakeonlan==3.1.0"
 
-RUN python3 -m pip install --no-cache-dir --no-compile --no-binary=aioesphomeapi,bleak-esphome \
+RUN python3 -m pip install --no-cache-dir --no-compile --no-binary=aioesphomeapi \
       "aioesphomeapi==45.3.1" \
-      "bleak-esphome==3.9.4" \
       "esphome-dashboard-api==1.3.0"
 
 RUN python3 -m pip install --no-cache-dir --no-compile --no-binary=cached-ipaddress \
@@ -197,23 +202,24 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
       "ibeacon-ble==1.2.0" \
       "aiofiles==25.1.0"
 
-# Versions observed during Home Assistant 2026.7.1 startup on this config.
-RUN python3 -m pip install --no-cache-dir --no-compile \
-      "icmplib==3.0.4" \
-      "wakeonlan==3.3.0" \
-      "ical==13.2.5"
-
 RUN find /usr/local -depth \
       \( -type d \( -name test -o -name tests -o -name __pycache__ \) -o \
          -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.a' -o -name '*.la' \) \) \
       -exec rm -rf '{}' + && \
     rm -rf /root/.cache /root/.cargo /tmp/* /var/cache/apk/*
 
+# ============================================================
+# Download go2rtc binary
+# ============================================================
+RUN wget -O /usr/local/bin/go2rtc \
+      "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_armv7" && \
+    chmod +x /usr/local/bin/go2rtc
+
 FROM ${BASE_IMAGE} AS runtime
 
 SHELL ["/bin/sh", "-lc"]
 
-ARG HA_VERSION=2026.7.1
+ARG HA_VERSION=2026.7.2
 
 ENV PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=C.UTF-8 \
@@ -256,7 +262,8 @@ RUN apk add --no-cache \
       tiff \
       tzdata \
       xz-libs \
-      zlib && \
+      zlib \
+      libpcap && \
     apk add --no-cache \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
@@ -264,6 +271,7 @@ RUN apk add --no-cache \
       ffmpeg
 
 COPY --from=builder /usr/local /usr/local
+COPY --from=builder /usr/local/bin/go2rtc /usr/local/bin/go2rtc
 
 RUN ln -sf /usr/local/bin/python3.14 /usr/local/bin/python3 && \
     ln -sf /usr/local/bin/python3.14 /usr/local/bin/python && \
@@ -333,7 +341,7 @@ ENTRYPOINT ["/init"]
 
 FROM runtime AS full
 
-ARG HA_VERSION=2026.7.1
+ARG HA_VERSION=2026.7.2
 
 ENV CARGO_BUILD_JOBS=1
 
@@ -370,7 +378,8 @@ RUN apk add --no-cache --virtual .build-deps \
       openblas-dev \
       lapack-dev \
       libjpeg-turbo-dev \
-      postgresql-dev && \
+      postgresql-dev \
+      libpcap-dev && \
     apk add --no-cache \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
       --repository https://dl-cdn.alpinelinux.org/alpine/edge/community \
