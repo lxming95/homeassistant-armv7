@@ -41,15 +41,17 @@ scp ha-armv7-*.zip root@玩客云IP:/root/
 
 bash
 unzip ha-armv7-*.zip
-# 得到 ha-armv7-*.tar.gz 文件
-🚀 部署到玩客云
+## 得到 ha-armv7-*.tar.gz 文件
+## 🚀 部署到玩客云
 1. 加载镜像
+
 bash
 gunzip -c ha-armv7-*.tar.gz | docker load
 如果镜像较大，请耐心等待。加载成功后，会显示镜像名称，例如：
 
 text
 Loaded image: ghcr.io/你的用户名/ha-armv7:2026.7.2-full-armv7
+
 2. （可选）打上短标签
 bash
 docker tag ghcr.io/你的用户名/ha-armv7:2026.7.2-full-armv7 ha:latest
