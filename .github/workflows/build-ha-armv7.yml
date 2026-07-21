@@ -1,18 +1,18 @@
-name: Build Home Assistant armv7 (玩客云优化)
+name: Build Home Assistant armv7 (Artifact + 可选推送)
 
 on:
   workflow_dispatch:
     inputs:
       ha_version:
-        description: 'Home Assistant 版本'
+        description: 'Home Assistant 版本（例如 2026.7.2）'
         required: true
         default: '2026.7.2'
       integrations:
-        description: '要包含的集成（空格分隔）'
+        description: '要包含的集成（空格分隔），留空则使用默认精简列表'
         required: false
         default: 'default_config androidtv_remote backup cast co2signal dlna_dmr dlna_dms duckdns forecast_solar hue ipp met mobile_app modbus nest onvif openuv radio_browser samsungtv shelly sun tuya upnp wiz zha'
       build_target:
-        description: '构建目标'
+        description: '构建目标：full（内置编译工具） 或 runtime（不内置）'
         required: true
         default: 'full'
         type: choice
@@ -20,13 +20,14 @@ on:
           - full
           - runtime
       push_to_registry:
-        description: '是否推送到 ghcr.io'
+        description: '是否推送到 ghcr.io（需正确配置权限）'
         required: true
-        default: false
+        default: false   # 默认不推送，只生成 artifact
         type: boolean
 
 env:
   REGISTRY: ghcr.io
+  # 自动使用当前仓库所有者（即您的用户名 lxming95）作为命名空间
   IMAGE_NAME: ${{ github.repository_owner }}/ha-armv7
 
 jobs:
@@ -44,7 +45,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR（可选）
+      - name: Log in to GHCR（仅当推送时）
         if: ${{ inputs.push_to_registry }}
         uses: docker/login-action@v3
         with:
@@ -64,6 +65,7 @@ jobs:
           echo "INTEGRATIONS=$INTEGRATIONS" >> $GITHUB_OUTPUT
           echo "BUILD_TARGET=${{ inputs.build_target }}" >> $GITHUB_OUTPUT
           TARGET_SUFFIX="${{ inputs.build_target }}"
+          # 标签格式：版本-目标-armv7，例如 2026.7.2-full-armv7
           IMAGE_TAG=$(echo "${HA_VERSION}-${TARGET_SUFFIX}-armv7" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
           LATEST_TAG=$(echo "latest-${TARGET_SUFFIX}-armv7" | tr '[:upper:]' '[:lower:]')
@@ -75,7 +77,7 @@ jobs:
         with:
           context: .
           platforms: linux/arm/v7
-          push: false
+          push: false               # 先不推送，只构建
           target: ${{ steps.prep.outputs.BUILD_TARGET }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.IMAGE_TAG }}
@@ -85,9 +87,9 @@ jobs:
             INTEGRATIONS=${{ steps.prep.outputs.INTEGRATIONS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          load: true
+          load: true                # 载入到本地 Docker daemon，以便后续 save
 
-      - name: 导出镜像为 .tar.gz
+      - name: 导出镜像为 .tar.gz 并上传 Artifact（总是执行）
         run: |
           IMAGE_FULL="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.IMAGE_TAG }}"
           ARTIFACT_NAME="ha-armv7-${{ steps.prep.outputs.IMAGE_TAG }}.tar.gz"
