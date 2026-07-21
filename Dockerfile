@@ -212,7 +212,7 @@ RUN find /usr/local -depth \
 # Download go2rtc binary
 # ============================================================
 RUN wget -O /usr/local/bin/go2rtc \
-      "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_armv7" && \
+      "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_arm" && \
     chmod +x /usr/local/bin/go2rtc
 
 FROM ${BASE_IMAGE} AS runtime
