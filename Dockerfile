@@ -80,12 +80,16 @@ RUN wget -O /tmp/Python-${PYTHON_VERSION}.tgz \
 
 RUN python3 -m pip install --no-cache-dir --no-compile -U pip wheel setuptools
 
-# Home Assistant core and native packages that are known to fail or pick wrong
-# versions when installed lazily at runtime on ARMv7/Python 3.14.
+# Home Assistant core, frontend (auto‑matched version) and early native packages
+# ---------------------------------------------------------------------------
 RUN python3 -m pip install --no-cache-dir --no-compile \
       "Cython>=3.0.6" \
       "meson-python>=0.15.0" && \
     python3 -m pip install --no-cache-dir --no-compile -U "homeassistant==${HA_VERSION}" && \
+    FRONTEND_VERSION=$(grep -oP 'home-assistant-frontend==\K[^\s]+' \
+      /usr/local/lib/python3.14/site-packages/homeassistant/package_constraints.txt | head -1) && \
+    echo "Detected required frontend version: ${FRONTEND_VERSION}" && \
+    python3 -m pip install --no-cache-dir --no-compile "home-assistant-frontend==${FRONTEND_VERSION}" && \
     python3 -m pip install --no-cache-dir --no-compile --no-build-isolation \
       "numpy==2.3.2"
 
@@ -154,8 +158,8 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
 RUN python3 -m pip install --no-cache-dir --no-compile \
       "colorlog==6.10.1"
 
+# All other pinned integration dependencies – frontend already installed above.
 RUN python3 -m pip install --no-cache-dir --no-compile \
-      "home-assistant-frontend==20260624.5" \
       "infrared-protocols==6.3.0" \
       "rf-protocols==4.3.0" \
       "jsonpath-python==1.1.6" \
