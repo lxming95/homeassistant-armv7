@@ -155,7 +155,7 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
       "colorlog==6.10.1"
 
 RUN python3 -m pip install --no-cache-dir --no-compile \
-      "home-assistant-frontend==20260624.4" \
+      "home-assistant-frontend==20260624.5" \
       "infrared-protocols==6.3.0" \
       "rf-protocols==4.3.0" \
       "jsonpath-python==1.1.6" \
