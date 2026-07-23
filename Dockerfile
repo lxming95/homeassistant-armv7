@@ -86,9 +86,6 @@ RUN python3 -m pip install --no-cache-dir --no-compile \
       "Cython>=3.0.6" \
       "meson-python>=0.15.0" && \
     python3 -m pip install --no-cache-dir --no-compile -U "homeassistant==${HA_VERSION}" && \
-    FRONTEND_VERSION=$(python3 -c "from homeassistant.components.frontend import REQUIRED_FRONTEND_VERSION; print(REQUIRED_FRONTEND_VERSION)") && \
-    echo "Detected required frontend version: ${FRONTEND_VERSION}" && \
-    python3 -m pip install --no-cache-dir --no-compile "home-assistant-frontend==${FRONTEND_VERSION}" && \
     python3 -m pip install --no-cache-dir --no-compile --no-build-isolation \
       "numpy==2.3.2"
 
